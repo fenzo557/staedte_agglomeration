@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Städte sortieren: weltweit und Deutschland</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px;background:#f3f6fb;color:#17243a;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:800px;margin:auto}
+  section{background:#fff;border:1px solid #d7dfeb;border-radius:16px;padding:20px;margin:14px 0}
+  h1{line-height:1.15;margin-top:8px}
+  .note{color:#526176;font-size:.92rem}
+  ol{list-style:none;padding:0;margin:14px 0}
+  li{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px;margin:8px 0;border:2px solid #d7dfeb;border-radius:12px;background:#fff}
+  li.dragging{opacity:.4}
+  li.over{border-color:#155eef}
+  .rank{font-weight:800;text-align:center;color:#526176}
+  .city-name{font-weight:750}
+  .country{display:block;color:#526176;font-size:.84rem;font-weight:400}
+  .controls{white-space:nowrap}
+  button{font:inherit;font-weight:700;border:1px solid #bac7d8;border-radius:9px;background:#fff;padding:8px 12px;cursor:pointer}
+  button:hover{background:#edf4ff;border-color:#155eef}
+  button:focus-visible{outline:3px solid #ffbf47;outline-offset:2px}
+  button.move{width:38px;height:38px;padding:0;margin-left:3px}
+  .primary{background:#155eef;color:#fff;border-color:#155eef}
+  .primary:hover{background:#0649d7;color:#fff}
+  .actions{display:flex;gap:9px;flex-wrap:wrap}
+  #result{display:none}
+  #result.show{display:block}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.82rem;font-weight:700}
+  .tag.green{background:#e4f5ea;color:#12643a}
+  .tag.yellow{background:#fff5cf;color:#735400}
+  .tag.red{background:#ffebe8;color:#9d271b}
+  .answer{padding:12px;border:1px solid #d7dfeb;border-radius:11px;margin:9px 0}
+  .answer.green{background:#e9f7ef;border-color:#a9dabb}
+  .answer.yellow{background:#fff8dc;border-color:#e9d37a}
+  .answer.red{background:#fff0ee;border-color:#f0b8b0}
+  .answer-title{font-weight:800}
+  .answer-detail{margin-top:5px;font-size:.92rem}
+  .callout{background:#edf4ff;padding:13px;border-radius:11px}
+  @media(max-width:480px){body{padding:10px}section{padding:14px}li{padding:8px;gap:5px}}
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <p><strong>Schätz- und Sortierspiel</strong></p>
+    <h1>Welche Städte sind am größten?</h1>
+    <p>Sortiere die zehn Städte nach ihrer Einwohnerzahl <strong>innerhalb der Stadtgrenzen</strong> – von groß nach klein.</p>
+    <p class="note">Während des Sortierens werden nur die Städtenamen und Länder angezeigt. Die Einwohnerzahlen der Stadt und ihrer Agglomeration erscheinen nach dem Prüfen.</p>
+    <p class="note"><strong>Hinweis:</strong> Die Stadtgrenzen und Erhebungsjahre unterscheiden sich zwischen den Ländern. Die Angaben sind gerundete beziehungsweise näherungsweise Werte.</p>
+  </section>
+
+  <section>
+    <h2>Deine Reihenfolge</h2>
+    <p class="note">Ziehe die Städte an eine andere Stelle oder nutze die Pfeile.</p>
+    <ol id="cities" aria-label="Zehn Städte sortieren"></ol>
+    <div class="actions">
+      <button class="primary" id="check" type="button">Prüfen</button>
+      <button id="shuffle" type="button">Nochmal mischen</button>
+    </div>
+  </section>
+
+  <section id="result" aria-live="polite">
+    <h2>Auflösung</h2>
+    <p id="score"></p>
+    <div id="groupScore"></div>
+    <div class="legend">
+      <span class="tag green">Grün: richtige Gesamtposition</span>
+      <span class="tag yellow">Gelb: richtige Reihenfolge innerhalb der Gruppe</span>
+      <span class="tag red">Rot: Reihenfolge innerhalb der Gruppe noch nicht richtig</span>
+    </div>
+    <p class="note">Die Liste unten zeigt die richtige Gesamt-Reihenfolge. Die Farben berücksichtigen zusätzlich, ob eine Stadt im Vergleich zu den anderen Städten ihrer Gruppe richtig eingeordnet wurde.</p>
+    <div id="answers"></div>
+    <p id="scale" class="callout"></p>
+  </section>
+
+  <section class="note">
+    <strong>Zu den Angaben:</strong> Einwohnerzahlen sind Schätz- beziehungsweise Zensuswerte aus unterschiedlichen Jahren. Agglomerationen können je nach Quelle und Abgrenzung variieren. Für Köln ist hier die zuvor genannte zusammenhängende Region Köln–Düsseldorf–Wuppertal–Bonn eingetragen.
+  </section>
+</main>
+
+<script>
+const cities = [
+  {name:"Jakarta",country:"Indonesien",group:"Weltweit",cityPopulation:10.56,cityYear:"2020",agglomeration:41.9,aggloLabel:"41,9 Mio."},
+  {name:"Dhaka",country:"Bangladesch",group:"Weltweit",cityPopulation:10.28,cityYear:"2022",agglomeration:36.6,aggloLabel:"36,6 Mio."},
+  {name:"Tokio",country:"Japan",group:"Weltweit",cityPopulation:9.73,cityYear:"2020 · 23 Bezirke",agglomeration:33.4,aggloLabel:"33,4 Mio."},
+  {name:"Neu-Delhi",country:"Indien",group:"Weltweit",cityPopulation:16.78,cityYear:"2011 · Delhi",agglomeration:30.2,aggloLabel:"30,2 Mio."},
+  {name:"Shanghai",country:"China",group:"Weltweit",cityPopulation:24.87,cityYear:"2020",agglomeration:29.6,aggloLabel:"29,6 Mio."},
+  {name:"Berlin",country:"Deutschland",group:"Deutschland",cityPopulation:3.70,cityYear:"2025",agglomeration:4.4923,aggloLabel:"4,49 Mio."},
+  {name:"Hamburg",country:"Deutschland",group:"Deutschland",cityPopulation:1.87,cityYear:"2025",agglomeration:2.6355,aggloLabel:"2,64 Mio."},
+  {name:"München",country:"Deutschland",group:"Deutschland",cityPopulation:1.51,cityYear:"2025",agglomeration:2.1541,aggloLabel:"2,15 Mio."},
+  {name:"Köln",country:"Deutschland",group:"Deutschland",cityPopulation:1.03,cityYear:"2025",agglomeration:4.3898,aggloLabel:"4,39 Mio. · Region Köln–Düsseldorf–Wuppertal–Bonn"},
+  {name:"Frankfurt am Main",country:"Deutschland",group:"Deutschland",cityPopulation:0.76,cityYear:"2025",agglomeration:1.8144,aggloLabel:"1,81 Mio."}
+];
+
+// Maßgeblich für die Sortierung ist die Einwohnerzahl innerhalb der Stadtgrenzen.
+const correct=[...cities].sort((a,b)=>b.cityPopulation-a.cityPopulation);
+const list=document.getElementById("cities");
+let order=[];
+let draggedName=null;
+
+function shuffle(items){
+  const arr=[...items];
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  if(arr.every((city,i)=>city.name===correct[i].name)){
+    [arr[0],arr[1]]=[arr[1],arr[0]];
+  }
+  return arr;
+}
+
+function render(){
+  list.innerHTML="";
+  order.forEach((city,i)=>{
+    const li=document.createElement("li");
+    li.draggable=true;
+    li.dataset.name=city.name;
+    li.innerHTML=`
+      <span class="rank">${i+1}.</span>
+      <span class="city-name">${city.name}<span class="country">${city.country} · ${city.group}</span></span>
+      <span class="controls">
+        <button class="move" type="button" aria-label="${city.name} nach oben" ${i===0?"disabled":""}>↑</button>
+        <button class="move" type="button" aria-label="${city.name} nach unten" ${i===order.length-1?"disabled":""}>↓</button>
+      </span>`;
+    li.querySelectorAll("button")[0].addEventListener("click",()=>move(i,-1));
+    li.querySelectorAll("button")[1].addEventListener("click",()=>move(i,1));
+    li.addEventListener("dragstart",e=>{
+      draggedName=city.name;
+      li.classList.add("dragging");
+      e.dataTransfer.setData("text/plain",city.name);
+    });
+    li.addEventListener("dragend",()=>{
+      draggedName=null;
+      li.classList.remove("dragging");
+      document.querySelectorAll("li.over").forEach(el=>el.classList.remove("over"));
+    });
+    li.addEventListener("dragover",e=>{e.preventDefault();li.classList.add("over")});
+    li.addEventListener("dragleave",()=>li.classList.remove("over"));
+    li.addEventListener("drop",e=>{
+      e.preventDefault();
+      li.classList.remove("over");
+      reorder(e.dataTransfer.getData("text/plain")||draggedName,city.name);
+    });
+    list.appendChild(li);
+  });
+}
+
+function move(index,delta){
+  const target=index+delta;
+  if(target<0||target>=order.length)return;
+  [order[index],order[target]]=[order[target],order[index]];
+  render();
+}
+
+function reorder(fromName,toName){
+  const from=order.findIndex(city=>city.name===fromName);
+  const to=order.findIndex(city=>city.name===toName);
+  if(from<0||to<0||from===to)return;
+  const [item]=order.splice(from,1);
+  order.splice(to,0,item);
+  render();
+}
+
+function formatCityPopulation(city){
+  const value=city.cityPopulation.toLocaleString("de-DE",{maximumFractionDigits:2});
+  return `${value} Mio. (${city.cityYear})`;
+}
+
+function getGroupPosition(city,sequence){
+  return sequence.filter(item=>item.group===city.group)
+    .findIndex(item=>item.name===city.name)+1;
+}
+
+function check(){
+  const exactCount=order.reduce((sum,city,i)=>sum+(city.name===correct[i].name?1:0),0);
+  document.getElementById("score").textContent=
+    `Gesamt-Reihenfolge: ${exactCount} von 10 Städten stehen an der genau richtigen Position.`;
+
+  const groups=["Weltweit","Deutschland"];
+  const groupScore=document.getElementById("groupScore");
+  groupScore.innerHTML="";
+  groups.forEach(group=>{
+    const expected=correct.filter(city=>city.group===group);
+    const rightWithinGroup=expected.filter(city=>
+      getGroupPosition(city,order)===getGroupPosition(city,correct)
+    ).length;
+    const label=group==="Weltweit"?"Weltweite Städte":"Deutsche Städte";
+    const p=document.createElement("p");
+    p.innerHTML=`<strong>${label}:</strong> ${rightWithinGroup} von ${expected.length} Städten stehen an der richtigen Stelle innerhalb ihrer Gruppe.`;
+    groupScore.appendChild(p);
+  });
+
+  const answers=document.getElementById("answers");
+  answers.innerHTML="";
+  correct.forEach((city,i)=>{
+    const studentIndex=order.findIndex(item=>item.name===city.name);
+    const exact=studentIndex===i;
+    const relativeCorrect=
+      getGroupPosition(city,order)===getGroupPosition(city,correct);
+    const color=exact?"green":relativeCorrect?"yellow":"red";
+    const row=document.createElement("div");
+    row.className=`answer ${color}`;
+    const studentRank=studentIndex+1;
+    const correctGroupRank=getGroupPosition(city,correct);
+    const studentGroupRank=getGroupPosition(city,order);
+    let status;
+    if(exact){
+      status="Richtige Gesamtposition.";
+    }else if(relativeCorrect){
+      status=`Nicht an der richtigen Gesamtposition, aber innerhalb der Gruppe richtig eingeordnet (Platz ${studentGroupRank} von 5).`;
+    }else{
+      status=`Deine Gesamtposition: ${studentRank}. Innerhalb der Gruppe: Platz ${studentGroupRank} statt Platz ${correctGroupRank}.`;
+    }
+    row.innerHTML=`
+      <div class="answer-title">${i+1}. ${city.name} <span class="note">(${city.country})</span></div>
+      <div class="answer-detail">
+        Stadt innerhalb der Stadtgrenzen: <strong>${formatCityPopulation(city)}</strong><br>
+        Agglomeration: <strong>${city.aggloLabel}</strong><br>
+        <span class="note">${status}</span>
+      </div>`;
+    answers.appendChild(row);
+  });
+
+  const largest=correct[0];
+  const smallest=correct[correct.length-1];
+  document.getElementById("scale").innerHTML=
+    `<strong>Größenordnung:</strong> Innerhalb ihrer Stadtgrenzen hat ${largest.name} etwa ${largest.cityPopulation.toLocaleString("de-DE",{maximumFractionDigits:2})} Millionen Einwohner, ${smallest.name} etwa ${smallest.cityPopulation.toLocaleString("de-DE",{maximumFractionDigits:2})} Millionen. Die Agglomeration ist ein größeres Gebiet und kann deshalb eine andere Einwohnerzahl – und eine andere Rangfolge – haben.`;
+
+  document.getElementById("result").classList.add("show");
+  document.getElementById("result").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+document.getElementById("check").addEventListener("click",check);
+document.getElementById("shuffle").addEventListener("click",()=>{
+  order=shuffle(cities);
+  document.getElementById("result").classList.remove("show");
+  render();
+});
+
+order=shuffle(cities);
+render();
+</script>
+</body>
+</html>
